@@ -21,7 +21,16 @@ jobs:
           java-version: 17
       - name: Prepare Android project
         run: |
-          mkdir -p www && cp index.html www/index.html
+          SRC=index.html
+          [ -f "$SRC" ] || SRC=$(ls *.html 2>/dev/null | head -1)
+          [ -n "$SRC" ] && [ -f "$SRC" ] || SRC=$(ls index* 2>/dev/null | head -1)
+          if [ -z "$SRC" ] || [ ! -f "$SRC" ]; then
+            echo "::error::В корне репозитория нет файла index.html. Загрузите его (Add file, Upload files) и запустите сборку снова."
+            ls -la
+            exit 1
+          fi
+          echo "Приложение: $SRC"
+          mkdir -p www && cp "$SRC" www/index.html
           npm init -y
           npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
           npx cap init "Запомни" com.zapomni.app --web-dir www
@@ -568,17 +577,28 @@ jobs:
           s=s.replace('<application',perms+q+'<application',1).replace('</application>',rec+'</application>',1)
           open(p,'w',encoding='utf-8').write(s)
           PY
-          if [ -f icon.png ]; then
-            CONV=$(command -v magick || command -v convert)
-            for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-              n=${pair%%:*}; z=${pair##*:}
-              d=android/app/src/main/res/mipmap-$n
-              mkdir -p $d
-              $CONV icon.png -resize ${z}x${z} $d/ic_launcher.png
-              cp $d/ic_launcher.png $d/ic_launcher_round.png
-              cp $d/ic_launcher.png $d/ic_launcher_foreground.png
-            done
-            rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          ICON=icon.png
+          [ -f "$ICON" ] || ICON=$(ls icon* 2>/dev/null | head -1)
+          if [ -n "$ICON" ] && [ -f "$ICON" ]; then
+            (
+              python3 -c "import PIL" 2>/dev/null || pip install -q --break-system-packages pillow || pip install -q pillow
+              ICON="$ICON" python3 - <<'PY'
+          import os
+          from PIL import Image
+          src=Image.open(os.environ['ICON']).convert('RGBA')
+          for n,z in [('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)]:
+              d='android/app/src/main/res/mipmap-'+n
+              os.makedirs(d,exist_ok=True)
+              im=src.resize((z,z),Image.LANCZOS)
+              for f in ('ic_launcher.png','ic_launcher_round.png','ic_launcher_foreground.png'):
+                  im.save(os.path.join(d,f))
+          for f in ('ic_launcher.xml','ic_launcher_round.xml'):
+              p=os.path.join('android/app/src/main/res/mipmap-anydpi-v26',f)
+              if os.path.exists(p): os.remove(p)
+          PY
+            ) || echo "Иконка не применена, сборка продолжится со стандартной"
+          else
+            echo "icon.png не найден, будет стандартная иконка"
           fi
           npx cap sync android
       - name: Build APK
