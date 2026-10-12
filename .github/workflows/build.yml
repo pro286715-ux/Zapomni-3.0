@@ -200,8 +200,19 @@ jobs:
               else if (k.equals("alarm") && Build.VERSION.SDK_INT >= 31) i = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse(pkg));
               else i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse(pkg));
               i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-              c.startActivity(i);
-              call.resolve();
+              try {
+                c.startActivity(i);
+                call.resolve();
+              } catch (Exception e) {
+                try {
+                  Intent f = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse(pkg));
+                  f.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                  c.startActivity(f);
+                  call.resolve();
+                } catch (Exception e2) {
+                  call.reject(String.valueOf(e2.getMessage()));
+                }
+              }
             }
           }
           EOF
