@@ -392,7 +392,14 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 function mig(g){g.id=g.id||uid();g.days.forEach(d=>{if(d.d=='Весь день')d.d='Каждый день';d.a=d.a.map(a=>a.acts?a:{id:a.id||uid(),name:a.t,f:a.f,to:a.to,p:a.p,by:a.by,acts:[{id:uid(),t:a.t,v:a.v||'',p:false}]});d.a.forEach(b=>{b.id=b.id||uid();b.acts.forEach(x=>{x.id=x.id||uid()})})})}
 ['home','shared'].forEach(k=>S[k].forEach(mig));
 S.shared=S.shared.filter(g=>/^\d+$/.test(String(g.id)));S.msgs=[];
-const NP=window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()?((Capacitor.Plugins&&Capacitor.Plugins.Zapomni)||(Capacitor.registerPlugin&&Capacitor.registerPlugin('Zapomni'))||null):null;
+const isNativeShell=()=>{try{const C=window.Capacitor;return !!(C&&((C.isNativePlatform&&C.isNativePlatform())||(C.getPlatform&&C.getPlatform()!=='web')))}catch(e){return false}};
+const NP=(()=>{if(!isNativeShell())return null;const C=window.Capacitor;
+ if(C.nativePromise)return new Proxy({},{get:(_,m)=>o=>C.nativePromise('Zapomni',String(m),o||{})});
+ if(C.Plugins&&C.Plugins.Zapomni)return C.Plugins.Zapomni;
+ if(C.registerPlugin){try{return C.registerPlugin('Zapomni')}catch(e){}}
+ return null})();
+const envNote=()=>isNativeShell()?'Приложение запущено на телефоне, но не нашло свой Android-модуль. Установите свежую сборку из Releases.':'Эти функции работают только в установленном приложении (APK), в браузере они недоступны.';
+const noNative=()=>{if(!NP&&isNativeShell()){toast('Не найден Android-модуль приложения. Обновите приложение из Releases.');return true}return false};
 const DOW={'Вс':1,'Пн':2,'Вт':3,'Ср':4,'Чт':5,'Пт':6,'Сб':7},TY={'Не беспокоить':'dnd','Беззвучный':'silent','Открыть ссылку':'link','Открыть приложение':'app','Блокировка телефона':'lock'};
 function sync(){if(!NP)return;try{const it=[],wg=[],ok=t=>/^\d\d:\d\d$/.test(t);
  ['home','shared'].forEach(k=>S[k].forEach(g=>{const rows=[];g.days.forEach(d=>{if(d.p)return;const days=d.d=='Каждый день'?[1,2,3,4,5,6,7]:[DOW[d.d]];d.a.forEach(b=>{if(b.p||!ok(b.f)||!ok(b.to))return;const as=b.acts.filter(a=>!a.p);rows.push({days,from:b.f,to:b.to,name:b.name,acts:as.map(a=>a.t).join(', ')});as.forEach(a=>it.push({id:a.id,type:TY[a.t],value:a.v||'',from:b.f,to:b.to,days,title:b.name+' · '+a.t+(a.v?' · '+a.v:''),text:b.f+'–'+b.to}));});});wg.push({id:g.id,name:g.name,rows});}));
@@ -520,7 +527,7 @@ function drawPic(g){const days=g.days.filter(d=>!d.p),W=1080,M=60,F='Nunito,Rubi
    as.forEach((a,i)=>{x.fillStyle='#FDCA5D';x.fillRect(M+24,y+84+i*46,10,10);x.fillStyle='#E1E4FA';x.font='600 30px '+F;x.fillText(a.t+(a.v?' · '+a.v:''),M+50,y+96+i*46,W-2*M-80);});
    y+=h+18;});y+=56;});
  return c.toDataURL('image/png');}
-function savePic(ref){const g=G(ref);let url;try{url=drawPic(g)}catch(e){return toast('Не удалось создать картинку')}
+function savePic(ref){if(noNative())return;const g=G(ref);let url;try{url=drawPic(g)}catch(e){return toast('Не удалось создать картинку')}
  const name='zapomni-'+(g.name||'raspisanie').replace(/[^\wа-яё]+/gi,'_')+'.png';
  if(NP)NP.saveImage({data:url.split(',')[1],name}).then(()=>toast('Сохранено в Галерею (Pictures/Zapomni)')).catch(()=>toast('Не удалось сохранить'));
  else{const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Картинка создана (в браузере скачивание может быть отключено)');}}
@@ -590,17 +597,17 @@ function openTpl(id){TPL={id,g:''};const t=TPLS.find(x=>x.id==id),gr=[...S.home.
  $('#tplv').innerHTML=`<div class="top"><button class="ib" data-tplclose aria-label="Назад">${ic('back')}</button><h1>${E(t.n)}</h1></div><div class="body"><div class="tpv"><img id="tplimg" alt="Предпросмотр шаблона" src="${tplUrl()}"></div>${t.fill?`<label class="tl" for="tplsel">Подставить моё расписание</label><select id="tplsel"><option value="">Пустой бланк</option>${gr.map(([v,n])=>`<option value="${v}">${E(n)}</option>`).join('')}</select>`:''}<div class="tbtn"><button class="cta" data-tplprint>Печать</button><button class="chip" data-tplsave>Сохранить картинку</button></div><p class="sub">Формат А4, ${t.land?'горизонтально':'вертикально'}. «Печать» откроет системное окно печати, а картинка сохранится в галерею.</p></div>`;
  $('#tplv').classList.add('on')}
 function closeTpl(){$('#tplv').classList.remove('on')}
-function tplPrint(){const t=TPLS.find(x=>x.id==TPL.id),url=drawTpl(TPL.id,TPL.g).toDataURL('image/png');
+function tplPrint(){if(noNative())return;const t=TPLS.find(x=>x.id==TPL.id),url=drawTpl(TPL.id,TPL.g).toDataURL('image/png');
  if(NP&&NP.printImage)NP.printImage({data:url.split(',')[1],landscape:!!t.land}).catch(()=>toast('Не удалось открыть печать'));
  else{try{const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
   f.srcdoc=`<html><head><style>@page{size:A4 ${t.land?'landscape':'portrait'};margin:0}body{margin:0}img{width:100%}</style></head><body><img src="${url}"></body></html>`;
   f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast('Печать недоступна в этом окне')}setTimeout(()=>f.remove(),2000)};}catch(e){toast('Печать недоступна')}}}
-function tplSave(){const url=drawTpl(TPL.id,TPL.g).toDataURL('image/png'),name='week2day-'+TPL.id+'.png';
+function tplSave(){if(noNative())return;const url=drawTpl(TPL.id,TPL.g).toDataURL('image/png'),name='week2day-'+TPL.id+'.png';
  if(NP)NP.saveImage({data:url.split(',')[1],name}).then(()=>toast('Сохранено в Галерею (Pictures/Zapomni)')).catch(()=>toast('Не удалось сохранить'));
  else{const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Картинка создана (в браузере скачивание может быть отключено)');}}
 let skip=false;
 const refreshPerm=()=>{NP&&NP.status().then(r=>{S.perm=r;render();}).catch(()=>{})};
-const perms=()=>`<div class="set"><div class="row">Разрешения Android</div>${NP?[['dnd','Не беспокоить и беззвучный'],['admin','Блокировка телефона'],['overlay','Ссылки и приложения'],['alarm','Точное время'],['battery','Работа в фоне']].map(([k,t])=>`<div class="row"><span>${t}</span><button class="badge" data-perm="${k}">${(S.perm||{})[k]?'Включено':'Включить'}</button></div>`).join('')+'<div class="row"><span>Виджет: все группы</span><button class="badge" data-widget>Добавить</button></div>':'<div class="empty" style="padding:10px 0">Доступно в установленном APK</div>'}</div>`;
+const perms=()=>`<div class="set"><div class="row">Разрешения Android</div>${NP?[['dnd','Не беспокоить и беззвучный'],['admin','Блокировка телефона'],['overlay','Ссылки и приложения'],['alarm','Точное время'],['battery','Работа в фоне']].map(([k,t])=>`<div class="row"><span>${t}</span><button class="badge" data-perm="${k}">${(S.perm||{})[k]?'Включено':'Включить'}</button></div>`).join('')+'<div class="row"><span>Виджет: все группы</span><button class="badge" data-widget>Добавить</button></div>':`<div class="empty" style="padding:10px 0">${envNote()}</div>`}</div>`;
 const tabs=[['home','Главная','home'],['notes','Заметки','note'],['tpl','Шаблоны','print'],['shared','Вместе','users'],['search','Поиск','search'],['me','Профиль','user']];
 const nav=a=>`<nav class="nav">${tabs.map(t=>`<button data-go="${t[0]}" class="${t[0]==a?'on':''}" aria-label="${t[1]}">${t[0]=='home'?`<img class="nh" src="${A.f_smile}" alt="">`:ic(t[2])}<span>${t[1]}</span></button>`).join('')}</nav><div class="gbar"><i></i></div>`;
 const hdr=(title,btns)=>`<div class="top"><h1>${title}</h1>${btns}</div>`;
@@ -681,7 +688,7 @@ document.addEventListener('click',e=>{if(Date.now()<noClick){e.stopPropagation()
  if(d.chat!==undefined){openChat(+d.chat);return;}
  if(d.prof!==undefined){S.prof=+d.prof;render();go('prof');return;}
  if(d.print!==undefined){savePic(d.print);return;}
- if(d.widget!==undefined||d.gw){if(!NP)return toast('Виджеты доступны в установленном APK');NP.pinWidget({gid:d.gw?G(d.gw).id:''}).then(r=>toast(r.ok?'Подтвердите добавление виджета':'Удерживайте экран → Виджеты → week2day')).catch(()=>toast('Не удалось добавить виджет'));return;}
+ if(d.widget!==undefined||d.gw){if(!NP)return toast(isNativeShell()?'Не найден Android-модуль приложения. Обновите приложение.':'Виджеты доступны в установленном приложении (APK)');NP.pinWidget({gid:d.gw?G(d.gw).id:''}).then(r=>toast(r.ok?'Подтвердите добавление виджета':'Удерживайте экран → Виджеты → week2day')).catch(()=>toast('Не удалось добавить виджет'));return;}
  if(d.sw){if(d.sw=='notif'){S.notif=!S.notif;toast(S.notif?'Уведомления включены':'Уведомления выключены')}else{S.theme=S.theme=='dark'?'light':'dark';$('#ph').dataset.t=S.theme;}render();go('me');return;}
  if(d.addgrp){if(d.addgrp=='shared'){if(!(CLOUD&&ME)){toast(CLOUD?'Войдите в аккаунт':'Совместные расписания работают через сервер');return;}pullFriends();openFriends();return;}S.nw=uid();S[d.addgrp].push({id:S.nw,name:'Новая группа',days:[]});render();go(d.addgrp);burst();return;}
  if(d.addnote!==undefined){S.notes.unshift({title:'Новая заметка',text:''});render();go('notes');openNote(0);return;}
