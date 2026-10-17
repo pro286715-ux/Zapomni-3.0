@@ -105,7 +105,7 @@ jobs:
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
 
-          @CapacitorPlugin(name = "week2day")
+          @CapacitorPlugin(name = "Zapomni")
           public class ZapomniPlugin extends Plugin {
             @PluginMethod
             public void schedule(PluginCall call) {
